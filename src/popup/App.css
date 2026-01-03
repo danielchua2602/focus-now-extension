@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  padding: 0;
+
+  width: 500px;
+
+  box-sizing: border-box;
+
+  font-size: 12px;
+}
+
+button {
+  cursor: pointer;
+}
