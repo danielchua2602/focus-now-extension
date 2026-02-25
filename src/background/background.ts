@@ -1,84 +1,117 @@
-import { Schedule } from "../types";
+import { ExtensionMessage } from '../types';
+import { storage } from '../lib/storage';
+import { isScheduleActive, isScheduleCompleted } from '../lib/scheduleUtils';
 
-// Listen for messages from popup
-chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
-  if (message.action === "updateRules") {
-    updateBlockingRules();
-  }
-});
+const ALARMS = {
+  checkSchedule: 'checkSchedule',
+  cleanupSchedules: 'cleanupSchedules',
+} as const;
 
-// Update blocking rules when extension installs/updates
+// ============================================================================
+// Initialization - Runs immediately when service worker activates
+// ============================================================================
+ensureAlarms();
+updateBlockingRules();
+
+// ============================================================================
+// Event Listeners
+// ============================================================================
+// when extension installs / updates
 chrome.runtime.onInstalled.addListener(() => {
+  ensureAlarms();
   updateBlockingRules();
-
-  // Set up alarms
-  chrome.alarms.create("checkSchedule", { periodInMinutes: 1 });
-  chrome.alarms.create("cleanupSchedules", { periodInMinutes: 1440 }); // Once per day
 });
+
+// on browser startup
+chrome.runtime.onStartup.addListener(() => {
+  ensureAlarms();
+  updateBlockingRules();
+});
+
+// popup adding / editing
+chrome.runtime.onMessage.addListener(
+  (message: ExtensionMessage, _sender, _sendResponse) => {
+    if (message.action === 'updateRules') {
+      updateBlockingRules();
+    }
+  }
+);
 
 // Handle all alarms in one listener
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === "checkSchedule") {
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name === ALARMS.checkSchedule) {
     updateBlockingRules();
-  } else if (alarm.name === "cleanupSchedules") {
-    chrome.storage.sync.get(["schedules"], (result) => {
-      const schedules = (result.schedules as Schedule[]) || [];
-      const today = new Date().toISOString().split("T")[0];
+  } else if (alarm.name === ALARMS.cleanupSchedules) {
+    const result = await storage.get(['schedules']);
+    const schedules = result.schedules || [];
+    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format in local timezone
 
-      // Remove past schedules
-      const activeSchedules = schedules.filter((s) => s.date >= today);
+    // Remove past schedules
+    const activeSchedules = schedules.filter((s) => s.endDate >= today);
 
-      chrome.storage.sync.set({ schedules: activeSchedules });
-    });
+    await storage.set({ schedules: activeSchedules });
   }
 });
 
-function updateBlockingRules(): void {
-  chrome.storage.sync.get(["blockedWebsites", "schedules"], (result) => {
-    const websites = (result.blockedWebsites as string[]) || [];
-    const schedules = (result.schedules as Schedule[]) || [];
+// ============================================================================
+// Core Functions
+// ============================================================================
 
-    // Check if blocking should be active based on schedules
-    // Only block during scheduled times
-    const shouldBlock = isBlockingActive(schedules);
+async function ensureAlarms() {
+  const checkAlarm = await chrome.alarms.get(ALARMS.checkSchedule);
+  if (!checkAlarm) {
+    chrome.alarms.create(ALARMS.checkSchedule, { periodInMinutes: 1 });
+  }
+  const cleanupAlarm = await chrome.alarms.get(ALARMS.cleanupSchedules);
+  if (!cleanupAlarm) {
+    chrome.alarms.create(ALARMS.cleanupSchedules, { periodInMinutes: 60 * 24 });
+  }
+}
 
-    // Remove all existing rules
-    chrome.declarativeNetRequest.getDynamicRules((existingRules) => {
-      const existingRuleIds = existingRules.map((rule) => rule.id);
+/**
+ * This function checks all schedules, removes completed ones,
+ * and updates blocking rules based on active schedules.
+ **/
+async function updateBlockingRules(): Promise<void> {
+  const result = await storage.get(['schedules']);
+  const schedules = result.schedules || [];
 
-      chrome.declarativeNetRequest.updateDynamicRules(
-        {
-          removeRuleIds: existingRuleIds,
-          addRules: shouldBlock ? createBlockingRules(websites) : [],
-        },
-        () => {
-          if (chrome.runtime.lastError) {
-            console.error("Error updating rules:", chrome.runtime.lastError);
-          } else {
-            console.log("Rules updated. Blocking:", shouldBlock, "Websites:", websites);
-          }
-        }
-      );
-    });
+  const activeSchedules = schedules.filter(
+    (schedule) => !isScheduleCompleted(schedule)
+  );
+
+  // Remove completed schedules
+  if (activeSchedules.length < schedules.length) {
+    const completedCount = schedules.length - activeSchedules.length;
+    console.log(`[FocusNow] Removing ${completedCount} completed schedule(s)`);
+    await storage.set({ schedules: activeSchedules });
+  }
+
+  const activeWebsites = activeSchedules
+    .filter((schedule) => isScheduleActive(schedule))
+    .map((schedule) => schedule.website);
+
+  // Remove duplicates
+  const uniqueActiveWebsites = Array.from(new Set(activeWebsites));
+
+  // Update blocking rules
+  const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
+  const existingRuleIds = existingRules.map((rule) => rule.id);
+  const newRules = createBlockingRules(uniqueActiveWebsites);
+
+  await chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: existingRuleIds,
+    addRules: newRules,
   });
 }
 
-function isBlockingActive(schedules: Schedule[]): boolean {
-  if (schedules.length === 0) return false;
+// ============================================================================
+// Helper Functions
+// ============================================================================
 
-  const now = new Date();
-  const currentDate = now.toISOString().split("T")[0];
-  const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
-
-  // Check if any schedule is active right now
-  return schedules.some((schedule) => {
-    if (schedule.date !== currentDate) return false;
-
-    return currentTime >= schedule.startTime && currentTime <= schedule.endTime;
-  });
-}
-
-function createBlockingRules(websites: string[]): chrome.declarativeNetRequest.Rule[] {
+function createBlockingRules(
+  websites: string[]
+): chrome.declarativeNetRequest.Rule[] {
   if (!websites || websites.length === 0) return [];
 
   const rules: chrome.declarativeNetRequest.Rule[] = [];
@@ -91,7 +124,7 @@ function createBlockingRules(websites: string[]): chrome.declarativeNetRequest.R
       action: {
         type: chrome.declarativeNetRequest.RuleActionType.REDIRECT,
         redirect: {
-          url: chrome.runtime.getURL("blocked.html"),
+          url: chrome.runtime.getURL('src/blocked/blocked.html'),
         },
       },
       condition: {
@@ -107,7 +140,7 @@ function createBlockingRules(websites: string[]): chrome.declarativeNetRequest.R
       action: {
         type: chrome.declarativeNetRequest.RuleActionType.REDIRECT,
         redirect: {
-          url: chrome.runtime.getURL("blocked.html"),
+          url: chrome.runtime.getURL('src/blocked/blocked.html'),
         },
       },
       condition: {

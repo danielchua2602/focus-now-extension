@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -12,7 +12,9 @@
       }
 
       body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+          Cantarell, sans-serif;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         min-height: 100vh;
         display: flex;
@@ -66,18 +68,20 @@
       <p>Get back to what matters most.</p>
       <div class="time" id="currentTime"></div>
       <div class="motivational">
-        "The key is not to prioritize what's on your schedule, but to schedule your priorities."
+        "The key is not to prioritize what's on your schedule, but to schedule
+        your priorities."
       </div>
     </div>
 
     <script>
       function updateTime() {
         const now = new Date();
-        const timeString = now.toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
+        const timeString = now.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
         });
-        document.getElementById("currentTime").textContent = `Current time: ${timeString}`;
+        document.getElementById('currentTime').textContent =
+          `Current time: ${timeString}`;
       }
 
       updateTime();

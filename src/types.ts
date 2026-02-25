@@ -1,9 +1,13 @@
 export interface Schedule {
   id: number;
-  date: string;
+  website: string;
   allDay: boolean;
+  startDate: string;
   startTime: string;
+  endDate: string;
   endTime: string;
+  repeat: 'none' | 'daily' | 'weekly' | 'weekdays' | 'monthly' | 'yearly';
+  repeatEndDate?: string;
 }
 
 export interface StorageData {
@@ -11,20 +15,6 @@ export interface StorageData {
   schedules?: Schedule[];
 }
 
-export const storage = {
-  async get<K extends keyof StorageData>(keys: K[]): Promise<Pick<StorageData, K>> {
-    return new Promise((resolve) => {
-      chrome.storage.sync.get(keys, (result) => {
-        resolve(result as Pick<StorageData, K>);
-      });
-    });
-  },
+export type ScheduleTab = 'Active' | 'Upcoming';
 
-  async set(data: Partial<StorageData>): Promise<void> {
-    return new Promise((resolve) => {
-      chrome.storage.sync.set(data, () => {
-        resolve();
-      });
-    });
-  },
-};
+export type ExtensionMessage = { action: 'updateRules' };

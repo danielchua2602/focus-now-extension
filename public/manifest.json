@@ -3,7 +3,13 @@
   "name": "Focus Now",
   "version": "1.0",
   "description": "Block access to distracting websites with scheduled time blocks",
-  "permissions": ["storage", "declarativeNetRequest", "declarativeNetRequestWithHostAccess", "tabs", "alarms"],
+  "permissions": [
+    "storage",
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
+    "tabs",
+    "alarms"
+  ],
   "host_permissions": ["<all_urls>"],
   "web_accessible_resources": [
     {
