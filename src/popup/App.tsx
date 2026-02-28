@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Schedule, ScheduleTab, ExtensionMessage } from '../types';
-import { storage } from '../lib/storage';
+import { useState } from 'react';
+import { Schedule, ScheduleTab } from '../types';
 import { getCurrentDateTime, isScheduleActive } from '../lib/scheduleUtils';
 import ActiveScheduleList from './components/schedules/ActiveScheduleList';
 import UpcomingScheduleList from './components/schedules/UpcomingScheduleList';
@@ -11,88 +10,25 @@ import AddScheduleModal from './components/schedules/AddScheduleModal';
 import EditScheduleModal from './components/schedules/EditScheduleModal';
 import Toast from './components/ui/Toast';
 import clsx from 'clsx';
+import { useSchedules } from './hooks/useSchedules';
+import { useDarkMode } from './hooks/useDarkMode';
+import { useToast } from './hooks/useToast';
 
 function App() {
   const [activeTab, setActiveTab] = useState<ScheduleTab>('Active');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
 
-  useEffect(() => {
-    const loadData = async () => {
-      const data = await storage.get(['blockedWebsites', 'schedules']);
-      setSchedules(data.schedules || []);
-    };
-
-    loadData();
-
-    // Listen for storage changes (e.g., when background removes completed schedules)
-    const handleStorageChange = (
-      changes: { [key: string]: chrome.storage.StorageChange },
-      areaName: string
-    ) => {
-      if (areaName === 'sync' && changes.schedules) {
-        setSchedules(changes.schedules.newValue || []);
-      }
-    };
-
-    chrome.storage.onChanged.addListener(handleStorageChange);
-    return () => chrome.storage.onChanged.removeListener(handleStorageChange);
-  }, []);
-
-  // Persist dark mode preference
-  useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
-  }, [isDarkMode]);
-
-  const addSchedule = async (schedule: Omit<Schedule, 'id'>) => {
-    const newSchedule: Schedule = {
-      ...schedule,
-      id: Date.now(),
-    };
-
-    const newSchedules = [...schedules, newSchedule];
-    await storage.set({ schedules: newSchedules });
-    setSchedules(newSchedules);
-    // showStatus("Schedule saved", "success");
-    chrome.runtime.sendMessage<ExtensionMessage>({ action: 'updateRules' });
-  };
-
-  const deleteSchedule = async (id: number) => {
-    const newSchedules = schedules.filter((s) => s.id !== id);
-    await storage.set({ schedules: newSchedules });
-    setSchedules(newSchedules);
-    // showStatus("Schedule deleted", "success");
-    chrome.runtime.sendMessage<ExtensionMessage>({ action: 'updateRules' });
-  };
-
-  const updateSchedule = async (
-    id: number,
-    updatedSchedule: Omit<Schedule, 'id'>
-  ) => {
-    const newSchedules = schedules.map((schedule) =>
-      schedule.id === id ? { ...updatedSchedule, id } : schedule
-    );
-    await storage.set({ schedules: newSchedules });
-    setSchedules(newSchedules);
-    chrome.runtime.sendMessage<ExtensionMessage>({ action: 'updateRules' });
-  };
+  const { schedules, addSchedule, deleteSchedule, updateSchedule } =
+    useSchedules();
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { message: successMessage, showToast, dismissToast } = useToast();
 
   const handleAddScheduleClick = (schedule: Omit<Schedule, 'id'>) => {
     addSchedule(schedule);
     setIsModalOpen(false);
-    setSuccessMessage('Schedule added successfully!');
-
-    // Auto-dismiss after 3 seconds
-    setTimeout(() => {
-      setSuccessMessage(null);
-    }, 3000);
+    showToast('Schedule added successfully!');
   };
 
   const handleEditScheduleClick = (schedule: Schedule) => {
@@ -107,12 +43,7 @@ function App() {
     updateSchedule(id, updatedSchedule);
     setIsEditModalOpen(false);
     setEditingSchedule(null);
-    setSuccessMessage('Schedule updated successfully!');
-
-    // Auto-dismiss after 3 seconds
-    setTimeout(() => {
-      setSuccessMessage(null);
-    }, 3000);
+    showToast('Schedule updated successfully!');
   };
 
   const handleCancelEdit = () => {
@@ -146,15 +77,8 @@ function App() {
   return (
     <div className={clsx({ dark: isDarkMode })}>
       <div className="relative bg-background">
-        <Toast
-          message={successMessage}
-          type="success"
-          onClose={() => setSuccessMessage(null)}
-        />
-        <Header
-          isDarkMode={isDarkMode}
-          onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
-        />
+        <Toast message={successMessage} type="success" onClose={dismissToast} />
+        <Header isDarkMode={isDarkMode} onToggleDarkMode={toggleDarkMode} />
         <NavigationBar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
