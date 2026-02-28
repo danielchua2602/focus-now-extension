@@ -1,4 +1,5 @@
 import { Schedule } from '../../types';
+import { getCurrentDateTime } from '../../lib/scheduleUtils';
 
 export const repeatLabels: Record<Schedule['repeat'], string> = {
   none: '',
@@ -69,7 +70,7 @@ export const formatScheduleDateTime = (schedule: Schedule): string => {
 };
 
 export const formatRelativeStartTime = (schedule: Schedule): string => {
-  const now = new Date();
+  const { now } = getCurrentDateTime();
   const startDateTime = new Date(`${schedule.startDate}T${schedule.startTime}`);
   const diffMs = startDateTime.getTime() - now.getTime();
   const diffMinutes = Math.floor(diffMs / (1000 * 60));

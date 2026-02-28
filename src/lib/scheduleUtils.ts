@@ -1,8 +1,9 @@
 import { Schedule } from '../types';
 
-function getCurrentDateTime() {
+export function getCurrentDateTime() {
   const now = new Date();
   return {
+    now,
     currentDate: now.toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
     currentTime: now.toTimeString().slice(0, 5), // HH:MM format
   };

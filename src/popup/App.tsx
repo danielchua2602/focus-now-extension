@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Schedule, ScheduleTab, ExtensionMessage } from '../types';
 import { storage } from '../lib/storage';
-import { isScheduleActive } from '../lib/scheduleUtils';
+import { getCurrentDateTime, isScheduleActive } from '../lib/scheduleUtils';
 import ActiveScheduleList from './components/schedules/ActiveScheduleList';
 import UpcomingScheduleList from './components/schedules/UpcomingScheduleList';
 import './App.css';
@@ -120,9 +120,7 @@ function App() {
     setEditingSchedule(null);
   };
 
-  const now = new Date();
-  const currentDate = now.toLocaleDateString('en-CA');
-  const currentTime = now.toTimeString().slice(0, 5);
+  const { currentDate, currentTime } = getCurrentDateTime();
 
   const activeScheduleList = schedules.filter((schedule) =>
     isScheduleActive(schedule)

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Schedule } from '../../types';
+import { getCurrentDateTime } from '../../lib/scheduleUtils';
 
 interface UseScheduleFormReturn {
   formState: {
@@ -30,9 +31,7 @@ export function useScheduleForm(
   setError: (error: string | null) => void,
   initialSchedule?: Schedule
 ): UseScheduleFormReturn {
-  const now = new Date();
-  const today = now.toLocaleDateString('en-CA');
-  const currentTime = now.toTimeString().slice(0, 5);
+  const { currentDate: today, currentTime } = getCurrentDateTime();
 
   const [website, setWebsite] = useState(initialSchedule?.website ?? '');
   const [allDay, setAllDay] = useState(initialSchedule?.allDay ?? false);

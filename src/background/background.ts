@@ -1,6 +1,10 @@
 import { ExtensionMessage } from '../types';
 import { storage } from '../lib/storage';
-import { isScheduleActive, isScheduleCompleted } from '../lib/scheduleUtils';
+import {
+  getCurrentDateTime,
+  isScheduleActive,
+  isScheduleCompleted,
+} from '../lib/scheduleUtils';
 
 const ALARMS = {
   checkSchedule: 'checkSchedule',
@@ -44,7 +48,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   } else if (alarm.name === ALARMS.cleanupSchedules) {
     const result = await storage.get(['schedules']);
     const schedules = result.schedules || [];
-    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format in local timezone
+    const { currentDate: today } = getCurrentDateTime();
 
     // Remove past schedules
     const activeSchedules = schedules.filter((s) => s.endDate >= today);
